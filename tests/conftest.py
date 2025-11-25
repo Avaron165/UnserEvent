@@ -25,14 +25,56 @@ from app.models import (
 @pytest.fixture
 async def db() -> AsyncGenerator[AsyncSession, None]:
     """
-    Fixture that provides a database session for each test.
-    Creates a new engine per test to avoid event loop issues on Windows.
+    Fixture that provides a database session for each test with automatic rollback.
+
+    All changes made during the test are automatically rolled back at the end,
+    so test data is cleaned up while pre-existing data remains untouched.
+
+    Tests can still call commit() - it creates a savepoint instead of actually
+    committing, so the rollback at the end undoes all changes.
+    """
+    # Create engine per test to avoid event loop issues on Windows
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        echo=False,
+        poolclass=NullPool,
+    )
+
+    async with engine.connect() as conn:
+        # Start a transaction that we'll roll back at the end
+        await conn.begin()
+
+        # Use begin_nested() to create savepoints when session.commit() is called
+        await conn.begin_nested()
+
+        async with AsyncSession(bind=conn, expire_on_commit=False) as session:
+            # Override commit to use savepoints instead of real commits
+            @session.sync_session.event.listens_for(session.sync_session, "after_transaction_end")
+            def restart_savepoint(session_sync, transaction):
+                if transaction.nested and not transaction._parent.nested:
+                    # Restart the savepoint after each commit
+                    session_sync.begin_nested()
+
+            try:
+                yield session
+            finally:
+                # Roll back everything - this undoes all test changes
+                await conn.rollback()
+
+    await engine.dispose()
+
+
+@pytest.fixture
+async def db_persistent() -> AsyncGenerator[AsyncSession, None]:
+    """
+    Fixture that provides a database session that actually commits changes.
+    Use this only when you need changes to persist (e.g., for integration tests).
     """
     # Create engine per test to avoid event loop issues
     engine = create_async_engine(
         settings.DATABASE_URL,
         echo=False,
-        poolclass=NullPool,  # Don't pool connections
+        poolclass=NullPool,
     )
 
     session_factory = async_sessionmaker(
@@ -50,31 +92,6 @@ async def db() -> AsyncGenerator[AsyncSession, None]:
             raise
         finally:
             await session.close()
-
-    # Dispose engine after test
-    await engine.dispose()
-
-
-@pytest.fixture
-async def db_with_rollback() -> AsyncGenerator[AsyncSession, None]:
-    """
-    Fixture that provides a database session with automatic rollback.
-    Use this when you want to ensure test isolation without persistent changes.
-    """
-    # Create engine per test to avoid event loop issues
-    engine = create_async_engine(
-        settings.DATABASE_URL,
-        echo=False,
-        poolclass=NullPool,
-    )
-
-    async with engine.connect() as conn:
-        await conn.begin()
-        async with AsyncSession(bind=conn) as session:
-            try:
-                yield session
-            finally:
-                await conn.rollback()
 
     await engine.dispose()
 
