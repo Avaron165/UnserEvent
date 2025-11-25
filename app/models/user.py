@@ -47,6 +47,7 @@ class User(Base):
         "Person",
         back_populates="user",
         lazy="selectin",
+        foreign_keys=[id],
     )
 
     # Relationship to roles

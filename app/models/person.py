@@ -33,6 +33,7 @@ class Person(Base, CreatedModifiedMixin):
         back_populates="person",
         uselist=False,
         lazy="selectin",
+        foreign_keys="User.id",
     )
 
     team_memberships: Mapped[list["TeamMember"]] = relationship(
