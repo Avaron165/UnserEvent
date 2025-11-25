@@ -9,6 +9,8 @@ from app.models.user import User
 from app.dependencies.auth import get_current_user
 from app.services.permissions import (
     is_admin,
+    is_superuser,
+    has_elevated_privileges,
     has_global_role,
     can_manage_division,
     can_view_division,
@@ -33,6 +35,40 @@ def require_admin():
         return current_user
 
     return _require_admin
+
+
+def require_superuser():
+    """Dependency that requires the user to be a superuser."""
+
+    async def _require_superuser(
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db),
+    ) -> User:
+        if not await is_superuser(db, current_user.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Superuser access required",
+            )
+        return current_user
+
+    return _require_superuser
+
+
+def require_elevated_privileges():
+    """Dependency that requires the user to be a superuser or admin."""
+
+    async def _require_elevated(
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db),
+    ) -> User:
+        if not await has_elevated_privileges(db, current_user.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin or superuser access required",
+            )
+        return current_user
+
+    return _require_elevated
 
 
 def require_role(role_name: str):
