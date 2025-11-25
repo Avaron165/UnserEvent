@@ -395,7 +395,7 @@ async def admin_user(api_db: AsyncSession) -> dict:
     Create an admin user and return user info with password.
     """
     from uuid import uuid4
-    from tests.crud import create_user, assign_role_to_user
+    from tests.crud import create_user, assign_role_to_user, get_or_create_role
 
     username = f"admin_{uuid4().hex[:8]}"
     password = "adminpassword123"
@@ -410,7 +410,8 @@ async def admin_user(api_db: AsyncSession) -> dict:
     )
     await api_db.commit()
 
-    # Assign admin role
+    # Ensure admin role exists and assign it
+    await get_or_create_role(api_db, "admin", "Full system access")
     await assign_role_to_user(api_db, user.id, "admin")
     await api_db.commit()
 
@@ -449,7 +450,7 @@ async def superuser(api_db: AsyncSession) -> dict:
     Create a superuser and return user info with password.
     """
     from uuid import uuid4
-    from tests.crud import create_user, assign_role_to_user
+    from tests.crud import create_user, assign_role_to_user, get_or_create_role
 
     username = f"superuser_{uuid4().hex[:8]}"
     password = "superpassword123"
@@ -464,7 +465,8 @@ async def superuser(api_db: AsyncSession) -> dict:
     )
     await api_db.commit()
 
-    # Assign superuser role
+    # Ensure superuser role exists and assign it
+    await get_or_create_role(api_db, "superuser", "Full superuser access")
     await assign_role_to_user(api_db, user.id, "superuser")
     await api_db.commit()
 

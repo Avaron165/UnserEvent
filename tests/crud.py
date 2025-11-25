@@ -708,6 +708,17 @@ async def get_role_by_name(db: AsyncSession, name: str) -> Optional[Role]:
     return result.scalar_one_or_none()
 
 
+async def get_or_create_role(db: AsyncSession, name: str, description: str = "") -> Role:
+    """Get a role by name or create it if it doesn't exist."""
+    role = await get_role_by_name(db, name)
+    if role is None:
+        role = Role(name=name, description=description)
+        db.add(role)
+        await db.flush()
+        await db.refresh(role)
+    return role
+
+
 async def assign_role_to_user(
     db: AsyncSession,
     user_id: UUID,
