@@ -8,11 +8,11 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-import asyncio
 from typing import AsyncGenerator
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.pool import NullPool
 
 from app.config import settings
 from app.models.base import Base
@@ -22,27 +22,26 @@ from app.models import (
 )
 
 
-# Create test engine
-test_engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=False,
-)
-
-# Create test session factory
-TestSessionLocal = async_sessionmaker(
-    test_engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
-
-
 @pytest.fixture
 async def db() -> AsyncGenerator[AsyncSession, None]:
     """
     Fixture that provides a database session for each test.
-    Each test gets its own transaction that is rolled back after the test.
+    Creates a new engine per test to avoid event loop issues on Windows.
     """
-    async with TestSessionLocal() as session:
+    # Create engine per test to avoid event loop issues
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        echo=False,
+        poolclass=NullPool,  # Don't pool connections
+    )
+
+    session_factory = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    async with session_factory() as session:
         try:
             yield session
             await session.commit()
@@ -52,6 +51,9 @@ async def db() -> AsyncGenerator[AsyncSession, None]:
         finally:
             await session.close()
 
+    # Dispose engine after test
+    await engine.dispose()
+
 
 @pytest.fixture
 async def db_with_rollback() -> AsyncGenerator[AsyncSession, None]:
@@ -59,13 +61,22 @@ async def db_with_rollback() -> AsyncGenerator[AsyncSession, None]:
     Fixture that provides a database session with automatic rollback.
     Use this when you want to ensure test isolation without persistent changes.
     """
-    async with test_engine.connect() as conn:
+    # Create engine per test to avoid event loop issues
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        echo=False,
+        poolclass=NullPool,
+    )
+
+    async with engine.connect() as conn:
         await conn.begin()
         async with AsyncSession(bind=conn) as session:
             try:
                 yield session
             finally:
                 await conn.rollback()
+
+    await engine.dispose()
 
 
 @pytest.fixture
