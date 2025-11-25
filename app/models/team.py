@@ -116,7 +116,7 @@ class TeamMember(Base, CreatedModifiedMixin):
     )
 
     role: Mapped[TeamRole] = mapped_column(
-        SQLEnum(TeamRole),
+        SQLEnum(TeamRole, values_callable=lambda obj: [e.value for e in obj]),
         default=TeamRole.PLAYER,
         nullable=False,
     )

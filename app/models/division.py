@@ -91,7 +91,7 @@ class DivisionMember(Base, CreatedModifiedMixin):
     )
 
     role: Mapped[DivisionRole] = mapped_column(
-        SQLEnum(DivisionRole),
+        SQLEnum(DivisionRole, values_callable=lambda obj: [e.value for e in obj]),
         default=DivisionRole.MEMBER,
         nullable=False,
     )
