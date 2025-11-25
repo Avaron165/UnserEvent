@@ -2,10 +2,15 @@
 Tests for User CRUD and role operations.
 """
 import pytest
+from uuid import uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
+
+
 from app.services.auth import verify_password
+
+
 from tests.crud import (
     create_user,
     create_user_for_person,
@@ -21,29 +26,35 @@ from tests.crud import (
 )
 
 
+def unique_username(prefix: str = "user") -> str:
+    """Generate a unique username for testing."""
+    return f"{prefix}_{uuid4().hex[:8]}"
+
+
 class TestUserCreate:
     """Tests for creating users."""
 
     async def test_create_user(self, db: AsyncSession):
         """Test creating a user with all fields."""
+        username = unique_username("testuser")
         user = await create_user(
             db,
             firstname="Test",
             lastname="User",
-            username="testuser",
+            username=username,
             password="password123",
-            email="test@example.com",
+            email=f"{username}@example.com",
             mobile="+49123456789",
         )
         await db.commit()
 
         assert user.id is not None
-        assert user.username == "testuser"
+        assert user.username == username
         assert user.is_active is True
         assert user.person is not None
         assert user.person.firstname == "Test"
         assert user.person.lastname == "User"
-        assert user.person.email == "test@example.com"
+        assert user.person.email == f"{username}@example.com"
 
     async def test_user_password_hashed(self, db: AsyncSession):
         """Test that password is properly hashed."""
@@ -51,7 +62,7 @@ class TestUserCreate:
             db,
             firstname="Test",
             lastname="User",
-            username="hashtest",
+            username=unique_username("hashtest"),
             password="mypassword",
         )
         await db.commit()
@@ -63,29 +74,31 @@ class TestUserCreate:
 
     async def test_promote_person_to_user(self, db: AsyncSession):
         """Test promoting an existing person to a user."""
+        unique_email = f"existing_{uuid4().hex[:8]}@example.com"
         # Create person first
         person = await create_person(
             db,
             firstname="Existing",
             lastname="Person",
-            email="existing@example.com",
+            email=unique_email,
         )
         await db.commit()
 
         assert person.is_user is False
 
         # Promote to user
+        username = unique_username("existinguser")
         user = await create_user_for_person(
             db,
             person.id,
-            username="existinguser",
+            username=username,
             password="password123",
         )
         await db.commit()
 
         assert user is not None
         assert user.id == person.id
-        assert user.username == "existinguser"
+        assert user.username == username
 
         # Refresh person and check
         await db.refresh(person)
@@ -97,7 +110,7 @@ class TestUserCreate:
             db,
             firstname="Already",
             lastname="User",
-            username="alreadyuser",
+            username=unique_username("alreadyuser"),
             password="password123",
         )
         await db.commit()
@@ -106,7 +119,7 @@ class TestUserCreate:
         result = await create_user_for_person(
             db,
             user.id,
-            username="duplicate",
+            username=unique_username("duplicate"),
             password="password456",
         )
 
@@ -122,7 +135,7 @@ class TestUserRead:
             db,
             firstname="Get",
             lastname="Test",
-            username="gettest",
+            username=unique_username("gettest"),
             password="password",
         )
         await db.commit()
@@ -135,39 +148,40 @@ class TestUserRead:
 
     async def test_get_user_not_found(self, db: AsyncSession):
         """Test getting a non-existent user."""
-        from uuid import uuid4
-
         user = await get_user(db, uuid4())
 
         assert user is None
 
     async def test_get_user_by_username(self, db: AsyncSession):
         """Test getting a user by username."""
+        username = unique_username("uniqueusername")
         await create_user(
             db,
             firstname="Username",
             lastname="Test",
-            username="uniqueusername",
+            username=username,
             password="password",
         )
         await db.commit()
 
-        user = await get_user_by_username(db, "uniqueusername")
+        user = await get_user_by_username(db, username)
 
         assert user is not None
-        assert user.username == "uniqueusername"
+        assert user.username == username
 
     async def test_list_users(self, db: AsyncSession):
         """Test listing users."""
-        await create_user(db, firstname="List1", lastname="User", username="listuser1", password="pass")
-        await create_user(db, firstname="List2", lastname="User", username="listuser2", password="pass")
+        username1 = unique_username("listuser1")
+        username2 = unique_username("listuser2")
+        await create_user(db, firstname="List1", lastname="User", username=username1, password="pass")
+        await create_user(db, firstname="List2", lastname="User", username=username2, password="pass")
         await db.commit()
 
         users = await list_users(db)
 
         usernames = [u.username for u in users]
-        assert "listuser1" in usernames
-        assert "listuser2" in usernames
+        assert username1 in usernames
+        assert username2 in usernames
 
 
 class TestUserUpdate:
@@ -179,15 +193,16 @@ class TestUserUpdate:
             db,
             firstname="Update",
             lastname="Test",
-            username="oldusername",
+            username=unique_username("oldusername"),
             password="password",
         )
         await db.commit()
 
-        updated = await update_user(db, user.id, username="newusername")
+        new_username = unique_username("newusername")
+        updated = await update_user(db, user.id, username=new_username)
         await db.commit()
 
-        assert updated.username == "newusername"
+        assert updated.username == new_username
 
     async def test_update_password(self, db: AsyncSession):
         """Test updating a user's password."""
@@ -195,7 +210,7 @@ class TestUserUpdate:
             db,
             firstname="Password",
             lastname="Test",
-            username="passuser",
+            username=unique_username("passuser"),
             password="oldpassword",
         )
         await db.commit()
@@ -212,7 +227,7 @@ class TestUserUpdate:
             db,
             firstname="Active",
             lastname="User",
-            username="activeuser",
+            username=unique_username("activeuser"),
             password="password",
         )
         await db.commit()
@@ -234,7 +249,7 @@ class TestUserDelete:
             db,
             firstname="Delete",
             lastname="Test",
-            username="deleteuser",
+            username=unique_username("deleteuser"),
             password="password",
         )
         await db.commit()
@@ -267,7 +282,7 @@ class TestUserRoles:
             db,
             firstname="Role",
             lastname="Test",
-            username="roleuser",
+            username=unique_username("roleuser"),
             password="password",
         )
         await db.commit()
@@ -286,7 +301,7 @@ class TestUserRoles:
             db,
             firstname="Multi",
             lastname="Role",
-            username="multirole",
+            username=unique_username("multirole"),
             password="password",
         )
         await db.commit()
@@ -305,7 +320,7 @@ class TestUserRoles:
             db,
             firstname="Remove",
             lastname="Role",
-            username="removerole",
+            username=unique_username("removerole"),
             password="password",
         )
         await db.commit()
@@ -330,7 +345,7 @@ class TestUserRoles:
             db,
             firstname="Bad",
             lastname="Role",
-            username="badrole",
+            username=unique_username("badrole"),
             password="password",
         )
         await db.commit()
@@ -345,7 +360,7 @@ class TestUserRoles:
             db,
             firstname="Dup",
             lastname="Role",
-            username="duprole",
+            username=unique_username("duprole"),
             password="password",
         )
         await db.commit()
