@@ -25,6 +25,64 @@ from app.models import (
 )
 
 
+# ============================================================================
+# MOCK REDIS FOR TESTING
+# ============================================================================
+
+class MockRedis:
+    """In-memory mock Redis for testing."""
+
+    def __init__(self):
+        self._data = {}
+        self._expiry = {}
+
+    async def setex(self, key: str, seconds: int, value: str):
+        """Set key with expiry."""
+        self._data[key] = value
+        self._expiry[key] = seconds
+
+    async def get(self, key: str):
+        """Get value by key."""
+        return self._data.get(key)
+
+    async def delete(self, *keys):
+        """Delete keys."""
+        count = 0
+        for key in keys:
+            if key in self._data:
+                del self._data[key]
+                self._expiry.pop(key, None)
+                count += 1
+        return count
+
+    async def keys(self, pattern: str):
+        """Get keys matching pattern."""
+        import fnmatch
+        return [k for k in self._data.keys() if fnmatch.fnmatch(k, pattern)]
+
+    async def close(self):
+        """Mock close."""
+        pass
+
+
+# Global mock redis instance for tests
+_mock_redis = None
+
+
+def get_mock_redis():
+    """Get or create mock Redis instance."""
+    global _mock_redis
+    if _mock_redis is None:
+        _mock_redis = MockRedis()
+    return _mock_redis
+
+
+def reset_mock_redis():
+    """Reset mock Redis for test isolation."""
+    global _mock_redis
+    _mock_redis = MockRedis()
+
+
 @pytest.fixture
 async def db() -> AsyncGenerator[AsyncSession, None]:
     """
@@ -218,10 +276,21 @@ async def api_db() -> AsyncGenerator[AsyncSession, None]:
 async def client(api_db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """
     Async HTTP client for API testing.
-    Overrides the database dependency to use the test database session.
+    Overrides the database and Redis dependencies to use test instances.
     """
+    import app.redis as redis_module
+
     async def override_get_db():
         yield api_db
+
+    # Reset and patch mock Redis
+    reset_mock_redis()
+    original_get_redis = redis_module.get_redis
+
+    async def mock_get_redis():
+        return get_mock_redis()
+
+    redis_module.get_redis = mock_get_redis
 
     app.dependency_overrides[get_db] = override_get_db
 
@@ -230,6 +299,7 @@ async def client(api_db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
         yield ac
 
     app.dependency_overrides.clear()
+    redis_module.get_redis = original_get_redis
 
 
 @pytest.fixture
