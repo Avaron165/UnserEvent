@@ -92,15 +92,18 @@ class TestPersonRead:
 
     async def test_get_person_by_email(self, db: AsyncSession):
         """Test getting a person by email."""
+        from uuid import uuid4
+        unique_email = f"test-{uuid4()}@example.com"
+
         await create_person(
             db,
             firstname="Email",
             lastname="Test",
-            email="unique@example.com",
+            email=unique_email,
         )
         await db.commit()
 
-        person = await get_person_by_email(db, "unique@example.com")
+        person = await get_person_by_email(db, unique_email)
 
         assert person is not None
         assert person.firstname == "Email"
