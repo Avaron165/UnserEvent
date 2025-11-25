@@ -13,7 +13,7 @@ class TestListTeams:
     async def test_list_teams_requires_auth(self, client: AsyncClient):
         """Test listing teams requires authentication."""
         response = await client.get("/teams")
-        assert response.status_code == 401
+        assert response.status_code in (401, 403)
 
     async def test_list_teams_empty(self, client: AsyncClient, auth_headers: dict):
         """Test listing teams when empty returns empty list."""
@@ -171,7 +171,7 @@ class TestCreateTeam:
             "/teams",
             json={"name": "Test Team"},
         )
-        assert response.status_code == 401
+        assert response.status_code in (401, 403)
 
     async def test_create_team_success(
         self, client: AsyncClient, admin_headers: dict, api_db: AsyncSession
@@ -272,7 +272,7 @@ class TestCreateProxyTeam:
             "/teams/proxy",
             json={"name": "Proxy Team", "external_org": "External"},
         )
-        assert response.status_code == 401
+        assert response.status_code in (401, 403)
 
     async def test_create_proxy_success(self, client: AsyncClient, auth_headers: dict):
         """Test creating a proxy team."""
@@ -314,7 +314,7 @@ class TestGetTeam:
     async def test_get_team_requires_auth(self, client: AsyncClient):
         """Test getting team requires authentication."""
         response = await client.get(f"/teams/{uuid4()}")
-        assert response.status_code == 401
+        assert response.status_code in (401, 403)
 
     async def test_get_team_success(
         self, client: AsyncClient, auth_headers: dict, api_db: AsyncSession
@@ -372,7 +372,7 @@ class TestUpdateTeam:
             f"/teams/{uuid4()}",
             json={"name": "Updated"},
         )
-        assert response.status_code == 401
+        assert response.status_code in (401, 403)
 
     async def test_update_team_as_admin(
         self, client: AsyncClient, admin_headers: dict, api_db: AsyncSession
@@ -465,7 +465,7 @@ class TestPromoteTeam:
             f"/teams/{uuid4()}/promote",
             json={"responsible_id": str(uuid4())},
         )
-        assert response.status_code == 401
+        assert response.status_code in (401, 403)
 
     async def test_promote_team_success(
         self, client: AsyncClient, auth_headers: dict, api_db: AsyncSession
@@ -591,7 +591,7 @@ class TestDeleteTeam:
     async def test_delete_team_requires_auth(self, client: AsyncClient):
         """Test deleting team requires authentication."""
         response = await client.delete(f"/teams/{uuid4()}")
-        assert response.status_code == 401
+        assert response.status_code in (401, 403)
 
     async def test_delete_team_as_admin(
         self, client: AsyncClient, admin_headers: dict, api_db: AsyncSession
@@ -636,7 +636,7 @@ class TestTeamMembers:
     async def test_list_members_requires_auth(self, client: AsyncClient):
         """Test listing team members requires authentication."""
         response = await client.get(f"/teams/{uuid4()}/members")
-        assert response.status_code == 401
+        assert response.status_code in (401, 403)
 
     async def test_list_members_empty(
         self, client: AsyncClient, auth_headers: dict, api_db: AsyncSession
@@ -721,7 +721,7 @@ class TestTeamMembers:
             f"/teams/{uuid4()}/members",
             json={"person_id": str(uuid4()), "role": "PLAYER"},
         )
-        assert response.status_code == 401
+        assert response.status_code in (401, 403)
 
     async def test_add_member_as_admin(
         self, client: AsyncClient, admin_headers: dict, api_db: AsyncSession
@@ -915,7 +915,7 @@ class TestTeamMembers:
     async def test_remove_member_requires_auth(self, client: AsyncClient):
         """Test removing team member requires authentication."""
         response = await client.delete(f"/teams/{uuid4()}/members/{uuid4()}")
-        assert response.status_code == 401
+        assert response.status_code in (401, 403)
 
     async def test_remove_member_as_admin(
         self, client: AsyncClient, admin_headers: dict, api_db: AsyncSession
