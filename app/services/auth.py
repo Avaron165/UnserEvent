@@ -267,8 +267,18 @@ async def revoke_all_user_tokens(
 
 
 async def get_user_by_id(db: AsyncSession, user_id: UUID) -> Optional[User]:
-    """Get a user by ID."""
-    stmt = select(User).where(User.id == user_id)
+    """Get a user by ID with roles eagerly loaded."""
+    from sqlalchemy.orm import selectinload
+    from app.models.auth import UserRole, Role
+
+    stmt = (
+        select(User)
+        .options(
+            selectinload(User.person),
+            selectinload(User.user_roles).selectinload(UserRole.role),
+        )
+        .where(User.id == user_id)
+    )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
 

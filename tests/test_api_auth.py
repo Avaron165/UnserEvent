@@ -323,7 +323,7 @@ class TestGetMe:
     async def test_get_me_with_roles(
         self, client: AsyncClient, admin_headers: dict, admin_user: dict
     ):
-        """Test getting current user info as admin."""
+        """Test getting current user shows roles."""
         response = await client.get(
             "/auth/me",
             headers={"Authorization": admin_headers["Authorization"]},
@@ -331,7 +331,4 @@ class TestGetMe:
         assert response.status_code == 200
         data = response.json()
         assert data["username"] == admin_user["username"]
-        # Note: roles may be empty due to lazy loading not working in async SQLAlchemy
-        # The get_user_by_id function would need selectinload to fix this
-        assert "roles" in data
-        assert isinstance(data["roles"], list)
+        assert "admin" in data["roles"]
