@@ -1,10 +1,27 @@
-from pydantic_settings import BaseSettings
+from pathlib import Path
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
 from typing import List
 import json
 
 
+# Find .env file - look in current dir and parent dirs
+def find_env_file() -> Path:
+    current = Path.cwd()
+    for path in [current, *current.parents]:
+        env_file = path / ".env"
+        if env_file.exists():
+            return env_file
+    return current / ".env"
+
+
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=find_env_file(),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
     # Database
     DATABASE_URL: str
 
@@ -29,10 +46,6 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return json.loads(v)
         return v
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
 
 
 settings = Settings()
