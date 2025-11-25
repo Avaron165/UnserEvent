@@ -1,0 +1,114 @@
+# Example seed configuration for UnserEvent
+# Use with: python scripts/seed_db.py --config scripts/seed_example.yaml
+
+# Divisions (hierarchical structure)
+divisions:
+  - name: "SV Musterstadt"
+    description: "Main club"
+
+  - name: "Jugend"
+    description: "Youth department"
+    parent: "SV Musterstadt"
+
+  - name: "Senioren"
+    description: "Senior teams"
+    parent: "SV Musterstadt"
+
+  - name: "U-Jugend"
+    description: "U7 to U11"
+    parent: "Jugend"
+
+  - name: "D-Jugend"
+    description: "U12 to U13"
+    parent: "Jugend"
+
+# Users (people with login accounts)
+users:
+  - username: "superadmin"
+    firstname: "Super"
+    lastname: "Admin"
+    email: "superadmin@musterstadt.de"
+    password: "super123"
+    roles:
+      - superuser
+
+  - username: "vorstand"
+    firstname: "Klaus"
+    lastname: "Vorstand"
+    email: "vorstand@musterstadt.de"
+    password: "vorstand123"
+    roles:
+      - admin
+    divisions:
+      - name: "SV Musterstadt"
+        role: "admin"
+
+  - username: "jugendleiter"
+    firstname: "Maria"
+    lastname: "Jugendleiter"
+    email: "jugend@musterstadt.de"
+    password: "jugend123"
+    roles:
+      - user
+    divisions:
+      - name: "Jugend"
+        role: "admin"
+
+  - username: "trainer_u11"
+    firstname: "Peter"
+    lastname: "Trainer"
+    email: "trainer@musterstadt.de"
+    password: "trainer123"
+    roles:
+      - user
+    divisions:
+      - name: "U-Jugend"
+        role: "member"
+
+# Persons (people without login, e.g., players)
+persons:
+  - firstname: "Tim"
+    lastname: "Spieler"
+    email: "tim@example.com"
+    mobile: "+49 123 456789"
+
+  - firstname: "Max"
+    lastname: "Torwart"
+    email: "max@example.com"
+
+  - firstname: "Lisa"
+    lastname: "Stuermer"
+    email: "lisa@example.com"
+
+  - firstname: "Anna"
+    lastname: "Verteidiger"
+    email: "anna@example.com"
+
+# Teams
+teams:
+  - name: "U11"
+    description: "Under 11 team"
+    division: "U-Jugend"
+    responsible: "trainer_u11"
+    members:
+      - username: "trainer_u11"
+        role: "coach"
+      - email: "tim@example.com"
+        role: "player"
+      - email: "max@example.com"
+        role: "player"
+
+  - name: "U13"
+    description: "Under 13 team"
+    division: "D-Jugend"
+    responsible: "jugendleiter"
+    members:
+      - email: "lisa@example.com"
+        role: "player"
+      - email: "anna@example.com"
+        role: "player"
+
+  - name: "1. Mannschaft"
+    description: "First senior team"
+    division: "Senioren"
+    responsible: "vorstand"
