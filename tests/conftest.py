@@ -34,15 +34,19 @@ async def db() -> AsyncGenerator[AsyncSession, None]:
     engine = create_async_engine(
         settings.DATABASE_URL,
         echo=False,
-        poolclass=NullPool,
     )
 
-    async with AsyncSession(engine, expire_on_commit=False) as session:
-        try:
-            yield session
-        finally:
-            # Roll back everything - this undoes all test changes
-            await session.rollback()
+    # Get a connection and bind session to it to ensure all operations
+    # use the same connection/transaction
+    async with engine.connect() as conn:
+        # Start a savepoint-based transaction
+        async with conn.begin() as trans:
+            async with AsyncSession(bind=conn, expire_on_commit=False, join_transaction_mode="create_savepoint") as session:
+                try:
+                    yield session
+                finally:
+                    pass
+            # Transaction rolls back when we exit without committing
 
     await engine.dispose()
 
