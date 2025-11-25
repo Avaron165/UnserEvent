@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "UnserEvent DB",
+      "Group": "Servers",
+      "Host": "db",
+      "Port": 5432,
+      "MaintenanceDB": "unserevent",
+      "Username": "unserevent",
+      "SSLMode": "prefer",
+      "PassFile": "/pgpassfile"
+    }
+  }
+}
