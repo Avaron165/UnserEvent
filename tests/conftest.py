@@ -11,6 +11,7 @@ sys.path.insert(0, str(project_root))
 from typing import AsyncGenerator
 
 import pytest
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
 
@@ -49,7 +50,7 @@ async def db() -> AsyncGenerator[AsyncSession, None]:
 
         async with AsyncSession(bind=conn, expire_on_commit=False) as session:
             # Override commit to use savepoints instead of real commits
-            @session.sync_session.event.listens_for(session.sync_session, "after_transaction_end")
+            @event.listens_for(session.sync_session, "after_transaction_end")
             def restart_savepoint(session_sync, transaction):
                 if transaction.nested and not transaction._parent.nested:
                     # Restart the savepoint after each commit
@@ -58,6 +59,8 @@ async def db() -> AsyncGenerator[AsyncSession, None]:
             try:
                 yield session
             finally:
+                # Remove the event listener to avoid memory leaks
+                event.remove(session.sync_session, "after_transaction_end", restart_savepoint)
                 # Roll back everything - this undoes all test changes
                 await conn.rollback()
 
