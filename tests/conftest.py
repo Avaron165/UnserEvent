@@ -279,18 +279,23 @@ async def client(api_db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     Overrides the database and Redis dependencies to use test instances.
     """
     import app.redis as redis_module
+    import app.services.auth as auth_module
 
     async def override_get_db():
         yield api_db
 
-    # Reset and patch mock Redis
+    # Reset mock Redis
     reset_mock_redis()
-    original_get_redis = redis_module.get_redis
 
     async def mock_get_redis():
         return get_mock_redis()
 
+    # Patch get_redis at all import points
+    original_redis_get_redis = redis_module.get_redis
+    original_auth_get_redis = auth_module.get_redis
+
     redis_module.get_redis = mock_get_redis
+    auth_module.get_redis = mock_get_redis
 
     app.dependency_overrides[get_db] = override_get_db
 
@@ -299,7 +304,8 @@ async def client(api_db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
         yield ac
 
     app.dependency_overrides.clear()
-    redis_module.get_redis = original_get_redis
+    redis_module.get_redis = original_redis_get_redis
+    auth_module.get_redis = original_auth_get_redis
 
 
 @pytest.fixture
