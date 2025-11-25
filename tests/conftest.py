@@ -11,10 +11,13 @@ sys.path.insert(0, str(project_root))
 from typing import AsyncGenerator
 
 import pytest
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
 
 from app.config import settings
+from app.database import get_db
+from app.main import app
 from app.models.base import Base
 from app.models import (
     Person, User, Division, DivisionMember,
@@ -174,3 +177,215 @@ async def sample_proxy_team(db: AsyncSession) -> Team:
     )
     await db.commit()
     return team
+
+
+# ============================================================================
+# API TEST FIXTURES
+# ============================================================================
+
+@pytest.fixture
+async def api_db() -> AsyncGenerator[AsyncSession, None]:
+    """
+    Database session fixture for API tests.
+    Creates a new engine per test to avoid event loop issues.
+    """
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        echo=False,
+        poolclass=NullPool,
+    )
+
+    session_factory = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    async with session_factory() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+    await engine.dispose()
+
+
+@pytest.fixture
+async def client(api_db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+    """
+    Async HTTP client for API testing.
+    Overrides the database dependency to use the test database session.
+    """
+    async def override_get_db():
+        yield api_db
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def auth_user(api_db: AsyncSession) -> dict:
+    """
+    Create a test user and return user info with password.
+    """
+    from uuid import uuid4
+    from tests.crud import create_user
+
+    username = f"testuser_{uuid4().hex[:8]}"
+    password = "testpassword123"
+
+    user = await create_user(
+        api_db,
+        firstname="Test",
+        lastname="User",
+        username=username,
+        password=password,
+        email=f"{username}@example.com",
+    )
+    await api_db.commit()
+
+    return {
+        "user": user,
+        "username": username,
+        "password": password,
+        "email": f"{username}@example.com",
+    }
+
+
+@pytest.fixture
+async def auth_headers(client: AsyncClient, auth_user: dict) -> dict:
+    """
+    Get authentication headers for API requests.
+    Logs in the test user and returns the Authorization header.
+    """
+    response = await client.post(
+        "/auth/login",
+        json={
+            "username": auth_user["username"],
+            "password": auth_user["password"],
+        },
+    )
+    assert response.status_code == 200, f"Login failed: {response.text}"
+    tokens = response.json()
+
+    return {
+        "Authorization": f"Bearer {tokens['access_token']}",
+        "refresh_token": tokens["refresh_token"],
+    }
+
+
+@pytest.fixture
+async def admin_user(api_db: AsyncSession) -> dict:
+    """
+    Create an admin user and return user info with password.
+    """
+    from uuid import uuid4
+    from tests.crud import create_user, assign_role_to_user
+
+    username = f"admin_{uuid4().hex[:8]}"
+    password = "adminpassword123"
+
+    user = await create_user(
+        api_db,
+        firstname="Admin",
+        lastname="User",
+        username=username,
+        password=password,
+        email=f"{username}@example.com",
+    )
+    await api_db.commit()
+
+    # Assign admin role
+    await assign_role_to_user(api_db, user.id, "admin")
+    await api_db.commit()
+
+    return {
+        "user": user,
+        "username": username,
+        "password": password,
+        "email": f"{username}@example.com",
+    }
+
+
+@pytest.fixture
+async def admin_headers(client: AsyncClient, admin_user: dict) -> dict:
+    """
+    Get admin authentication headers for API requests.
+    """
+    response = await client.post(
+        "/auth/login",
+        json={
+            "username": admin_user["username"],
+            "password": admin_user["password"],
+        },
+    )
+    assert response.status_code == 200, f"Admin login failed: {response.text}"
+    tokens = response.json()
+
+    return {
+        "Authorization": f"Bearer {tokens['access_token']}",
+        "refresh_token": tokens["refresh_token"],
+    }
+
+
+@pytest.fixture
+async def superuser(api_db: AsyncSession) -> dict:
+    """
+    Create a superuser and return user info with password.
+    """
+    from uuid import uuid4
+    from tests.crud import create_user, assign_role_to_user
+
+    username = f"superuser_{uuid4().hex[:8]}"
+    password = "superpassword123"
+
+    user = await create_user(
+        api_db,
+        firstname="Super",
+        lastname="User",
+        username=username,
+        password=password,
+        email=f"{username}@example.com",
+    )
+    await api_db.commit()
+
+    # Assign superuser role
+    await assign_role_to_user(api_db, user.id, "superuser")
+    await api_db.commit()
+
+    return {
+        "user": user,
+        "username": username,
+        "password": password,
+        "email": f"{username}@example.com",
+    }
+
+
+@pytest.fixture
+async def superuser_headers(client: AsyncClient, superuser: dict) -> dict:
+    """
+    Get superuser authentication headers for API requests.
+    """
+    response = await client.post(
+        "/auth/login",
+        json={
+            "username": superuser["username"],
+            "password": superuser["password"],
+        },
+    )
+    assert response.status_code == 200, f"Superuser login failed: {response.text}"
+    tokens = response.json()
+
+    return {
+        "Authorization": f"Bearer {tokens['access_token']}",
+        "refresh_token": tokens["refresh_token"],
+    }
