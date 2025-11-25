@@ -34,6 +34,7 @@ class MockRedis:
 
     def __init__(self):
         self._data = {}
+        self._sets = {}
         self._expiry = {}
 
     async def setex(self, key: str, seconds: int, value: str):
@@ -53,12 +54,41 @@ class MockRedis:
                 del self._data[key]
                 self._expiry.pop(key, None)
                 count += 1
+            if key in self._sets:
+                del self._sets[key]
+                count += 1
         return count
 
     async def keys(self, pattern: str):
         """Get keys matching pattern."""
         import fnmatch
         return [k for k in self._data.keys() if fnmatch.fnmatch(k, pattern)]
+
+    async def sadd(self, key: str, *values):
+        """Add members to a set."""
+        if key not in self._sets:
+            self._sets[key] = set()
+        added = 0
+        for value in values:
+            if value not in self._sets[key]:
+                self._sets[key].add(value)
+                added += 1
+        return added
+
+    async def srem(self, key: str, *values):
+        """Remove members from a set."""
+        if key not in self._sets:
+            return 0
+        removed = 0
+        for value in values:
+            if value in self._sets[key]:
+                self._sets[key].remove(value)
+                removed += 1
+        return removed
+
+    async def smembers(self, key: str):
+        """Get all members of a set."""
+        return self._sets.get(key, set())
 
     async def close(self):
         """Mock close."""
