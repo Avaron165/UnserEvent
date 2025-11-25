@@ -37,16 +37,12 @@ async def db() -> AsyncGenerator[AsyncSession, None]:
         poolclass=NullPool,
     )
 
-    async with engine.connect() as conn:
-        # Start a transaction that we'll roll back at the end
-        await conn.begin()
-
-        async with AsyncSession(bind=conn, expire_on_commit=False) as session:
-            try:
-                yield session
-            finally:
-                # Roll back everything - this undoes all test changes
-                await conn.rollback()
+    async with AsyncSession(engine, expire_on_commit=False) as session:
+        try:
+            yield session
+        finally:
+            # Roll back everything - this undoes all test changes
+            await session.rollback()
 
     await engine.dispose()
 
