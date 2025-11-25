@@ -30,6 +30,19 @@ async def is_admin(db: AsyncSession, user_id: UUID) -> bool:
     return await has_global_role(db, user_id, "admin")
 
 
+async def is_superuser(db: AsyncSession, user_id: UUID) -> bool:
+    """Check if user is a superuser (highest privilege level)."""
+    return await has_global_role(db, user_id, "superuser")
+
+
+async def has_elevated_privileges(db: AsyncSession, user_id: UUID) -> bool:
+    """
+    Check if user has elevated privileges (superuser or admin).
+    Superusers and admins can bypass division/team membership requirements.
+    """
+    return await is_superuser(db, user_id) or await is_admin(db, user_id)
+
+
 async def get_division_role(
     db: AsyncSession,
     user_id: UUID,
@@ -87,12 +100,12 @@ async def can_manage_division(
     """
     Check if user can manage a division.
     User can manage if:
-    - User is global admin, OR
+    - User is superuser or global admin, OR
     - User is admin of this division, OR
     - User is admin of any ancestor division
     """
-    # Global admin can manage anything
-    if await is_admin(db, user_id):
+    # Superuser or global admin can manage anything
+    if await has_elevated_privileges(db, user_id):
         return True
 
     # Check this division
@@ -118,11 +131,11 @@ async def can_view_division(
     """
     Check if user can view a division.
     User can view if:
-    - User is global admin, OR
+    - User is superuser or global admin, OR
     - User has any role in this division, OR
     - User has any role in an ancestor division
     """
-    if await is_admin(db, user_id):
+    if await has_elevated_privileges(db, user_id):
         return True
 
     # Check this division
@@ -164,11 +177,11 @@ async def can_manage_team(
     """
     Check if user can manage a team.
     User can manage if:
-    - User is global admin, OR
+    - User is superuser or global admin, OR
     - User is manager/coach in this team, OR
     - User can manage the team's division
     """
-    if await is_admin(db, user_id):
+    if await has_elevated_privileges(db, user_id):
         return True
 
     # Check team role
@@ -195,11 +208,11 @@ async def can_view_team(
     """
     Check if user can view a team.
     User can view if:
-    - User is global admin, OR
+    - User is superuser or global admin, OR
     - User has any role in this team, OR
     - User can view the team's division
     """
-    if await is_admin(db, user_id):
+    if await has_elevated_privileges(db, user_id):
         return True
 
     # Check team membership
@@ -226,11 +239,11 @@ async def can_manage_person(
     """
     Check if user can manage a person.
     User can manage if:
-    - User is global admin, OR
+    - User is superuser or global admin, OR
     - User is the person themselves, OR
     - User can manage any division/team the person belongs to
     """
-    if await is_admin(db, user_id):
+    if await has_elevated_privileges(db, user_id):
         return True
 
     # Can manage self
