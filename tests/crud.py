@@ -281,6 +281,7 @@ async def get_division_with_children(db: AsyncSession, division_id: UUID) -> Opt
         select(Division)
         .options(selectinload(Division.sub_divisions))
         .where(Division.id == division_id)
+        .execution_options(populate_existing=True)
     )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
@@ -511,6 +512,7 @@ async def get_team_with_members(db: AsyncSession, team_id: UUID) -> Optional[Tea
             selectinload(Team.division),
         )
         .where(Team.id == team_id)
+        .execution_options(populate_existing=True)
     )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
