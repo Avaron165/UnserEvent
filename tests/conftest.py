@@ -11,7 +11,6 @@ sys.path.insert(0, str(project_root))
 from typing import AsyncGenerator
 
 import pytest
-from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
 
@@ -30,9 +29,6 @@ async def db() -> AsyncGenerator[AsyncSession, None]:
 
     All changes made during the test are automatically rolled back at the end,
     so test data is cleaned up while pre-existing data remains untouched.
-
-    Tests can still call commit() - it creates a savepoint instead of actually
-    committing, so the rollback at the end undoes all changes.
     """
     # Create engine per test to avoid event loop issues on Windows
     engine = create_async_engine(
@@ -45,22 +41,10 @@ async def db() -> AsyncGenerator[AsyncSession, None]:
         # Start a transaction that we'll roll back at the end
         await conn.begin()
 
-        # Use begin_nested() to create savepoints when session.commit() is called
-        await conn.begin_nested()
-
         async with AsyncSession(bind=conn, expire_on_commit=False) as session:
-            # Override commit to use savepoints instead of real commits
-            @event.listens_for(session.sync_session, "after_transaction_end")
-            def restart_savepoint(session_sync, transaction):
-                if transaction.nested and not transaction._parent.nested:
-                    # Restart the savepoint after each commit
-                    session_sync.begin_nested()
-
             try:
                 yield session
             finally:
-                # Remove the event listener to avoid memory leaks
-                event.remove(session.sync_session, "after_transaction_end", restart_savepoint)
                 # Roll back everything - this undoes all test changes
                 await conn.rollback()
 
@@ -109,13 +93,13 @@ async def clean_db(db: AsyncSession) -> AsyncSession:
 
     # Clean before test
     await cleanup_all(db)
-    await db.commit()
+    await db.flush()
 
     yield db
 
     # Clean after test
     await cleanup_all(db)
-    await db.commit()
+    await db.flush()
 
 
 @pytest.fixture
@@ -130,7 +114,7 @@ async def sample_person(db: AsyncSession) -> Person:
         email="max@example.com",
         mobile="+49123456789",
     )
-    await db.commit()
+    await db.flush()
     return person
 
 
@@ -147,7 +131,7 @@ async def sample_user(db: AsyncSession) -> User:
         password="password123",
         email="admin@example.com",
     )
-    await db.commit()
+    await db.flush()
     return user
 
 
@@ -161,7 +145,7 @@ async def sample_division(db: AsyncSession) -> Division:
         name="FC Hersbruck",
         description="Main club division",
     )
-    await db.commit()
+    await db.flush()
     return division
 
 
@@ -177,7 +161,7 @@ async def sample_team(db: AsyncSession, sample_division: Division, sample_person
         division_id=sample_division.id,
         responsible_id=sample_person.id,
     )
-    await db.commit()
+    await db.flush()
     return team
 
 
@@ -192,5 +176,5 @@ async def sample_proxy_team(db: AsyncSession) -> Team:
         external_org="FC Bayern München",
         description="External team placeholder",
     )
-    await db.commit()
+    await db.flush()
     return team

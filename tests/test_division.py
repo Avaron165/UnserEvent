@@ -28,7 +28,7 @@ class TestDivisionCreate:
     async def test_create_division_minimal(self, db: AsyncSession):
         """Test creating a division with minimal required fields."""
         division = await create_division(db, name="Test Division")
-        await db.commit()
+        await db.flush()
 
         assert division.id is not None
         assert division.name == "Test Division"
@@ -43,7 +43,7 @@ class TestDivisionCreate:
             name="Full Division",
             description="A detailed description",
         )
-        await db.commit()
+        await db.flush()
 
         assert division.name == "Full Division"
         assert division.description == "A detailed description"
@@ -58,7 +58,7 @@ class TestDivisionCreate:
             name="Child Division",
             parent_id=parent.id,
         )
-        await db.commit()
+        await db.flush()
 
         assert child.parent_id == parent.id
 
@@ -79,7 +79,7 @@ class TestDivisionCreate:
         await db.flush()
 
         level3 = await create_division(db, name="Level 3", parent_id=level2.id)
-        await db.commit()
+        await db.flush()
 
         assert level3.parent_id == level2.id
         assert level2.parent_id == level1.id
@@ -92,7 +92,7 @@ class TestDivisionRead:
     async def test_get_division_by_id(self, db: AsyncSession):
         """Test getting a division by ID."""
         created = await create_division(db, name="Fetch Test")
-        await db.commit()
+        await db.flush()
 
         fetched = await get_division(db, created.id)
 
@@ -114,7 +114,7 @@ class TestDivisionRead:
         await db.flush()
 
         child = await create_division(db, name="Child", parent_id=root1.id)
-        await db.commit()
+        await db.flush()
 
         roots = await list_divisions(db, root_only=True)
 
@@ -130,7 +130,7 @@ class TestDivisionRead:
 
         child1 = await create_division(db, name="Child 1", parent_id=parent.id)
         child2 = await create_division(db, name="Child 2", parent_id=parent.id)
-        await db.commit()
+        await db.flush()
 
         children = await list_divisions(db, parent_id=parent.id)
 
@@ -146,10 +146,10 @@ class TestDivisionUpdate:
     async def test_update_division_name(self, db: AsyncSession):
         """Test updating a division's name."""
         division = await create_division(db, name="Original")
-        await db.commit()
+        await db.flush()
 
         updated = await update_division(db, division.id, name="Updated")
-        await db.commit()
+        await db.flush()
 
         assert updated.name == "Updated"
 
@@ -160,11 +160,11 @@ class TestDivisionUpdate:
         await db.flush()
 
         child = await create_division(db, name="Child", parent_id=parent1.id)
-        await db.commit()
+        await db.flush()
 
         # Move child to parent2
         updated = await update_division(db, child.id, parent_id=parent2.id)
-        await db.commit()
+        await db.flush()
 
         assert updated.parent_id == parent2.id
 
@@ -175,11 +175,11 @@ class TestDivisionDelete:
     async def test_delete_division(self, db: AsyncSession):
         """Test deleting a division."""
         division = await create_division(db, name="ToDelete")
-        await db.commit()
+        await db.flush()
         division_id = division.id
 
         result = await delete_division(db, division_id)
-        await db.commit()
+        await db.flush()
 
         assert result is True
         assert await get_division(db, division_id) is None
@@ -208,7 +208,7 @@ class TestDivisionMembers:
             person_id=person.id,
             role=DivisionRole.MEMBER,
         )
-        await db.commit()
+        await db.flush()
 
         assert member.id is not None
         assert member.division_id == division.id
@@ -227,7 +227,7 @@ class TestDivisionMembers:
             person_id=person.id,
             role=DivisionRole.ADMIN,
         )
-        await db.commit()
+        await db.flush()
 
         assert member.role == DivisionRole.ADMIN
 
@@ -238,7 +238,7 @@ class TestDivisionMembers:
         await db.flush()
 
         await add_division_member(db, division_id=division.id, person_id=person.id)
-        await db.commit()
+        await db.flush()
 
         membership = await get_division_membership(db, division.id, person.id)
 
@@ -257,10 +257,10 @@ class TestDivisionMembers:
             person_id=person.id,
             role=DivisionRole.MEMBER,
         )
-        await db.commit()
+        await db.flush()
 
         updated = await update_division_member(db, member.id, role=DivisionRole.MANAGER)
-        await db.commit()
+        await db.flush()
 
         assert updated.role == DivisionRole.MANAGER
 
@@ -273,7 +273,7 @@ class TestDivisionMembers:
 
         await add_division_member(db, division_id=division.id, person_id=person1.id)
         await add_division_member(db, division_id=division.id, person_id=person2.id)
-        await db.commit()
+        await db.flush()
 
         members = await list_division_members(db, division.id)
 
@@ -289,11 +289,11 @@ class TestDivisionMembers:
         await db.flush()
 
         member = await add_division_member(db, division_id=division.id, person_id=person.id)
-        await db.commit()
+        await db.flush()
         member_id = member.id
 
         result = await delete_division_member(db, member_id)
-        await db.commit()
+        await db.flush()
 
         assert result is True
         assert await get_division_member(db, member_id) is None

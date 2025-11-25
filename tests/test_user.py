@@ -46,7 +46,7 @@ class TestUserCreate:
             email=f"{username}@example.com",
             mobile="+49123456789",
         )
-        await db.commit()
+        await db.flush()
 
         assert user.id is not None
         assert user.username == username
@@ -65,7 +65,7 @@ class TestUserCreate:
             username=unique_username("hashtest"),
             password="mypassword",
         )
-        await db.commit()
+        await db.flush()
 
         # Password should be hashed, not plain text
         assert user.password_hash != "mypassword"
@@ -82,7 +82,7 @@ class TestUserCreate:
             lastname="Person",
             email=unique_email,
         )
-        await db.commit()
+        await db.flush()
 
         assert person.is_user is False
 
@@ -94,7 +94,7 @@ class TestUserCreate:
             username=username,
             password="password123",
         )
-        await db.commit()
+        await db.flush()
 
         assert user is not None
         assert user.id == person.id
@@ -113,7 +113,7 @@ class TestUserCreate:
             username=unique_username("alreadyuser"),
             password="password123",
         )
-        await db.commit()
+        await db.flush()
 
         # Try to promote again
         result = await create_user_for_person(
@@ -138,7 +138,7 @@ class TestUserRead:
             username=unique_username("gettest"),
             password="password",
         )
-        await db.commit()
+        await db.flush()
 
         fetched = await get_user(db, created.id)
 
@@ -162,7 +162,7 @@ class TestUserRead:
             username=username,
             password="password",
         )
-        await db.commit()
+        await db.flush()
 
         user = await get_user_by_username(db, username)
 
@@ -175,7 +175,7 @@ class TestUserRead:
         username2 = unique_username("listuser2")
         await create_user(db, firstname="List1", lastname="User", username=username1, password="pass")
         await create_user(db, firstname="List2", lastname="User", username=username2, password="pass")
-        await db.commit()
+        await db.flush()
 
         users = await list_users(db)
 
@@ -196,11 +196,11 @@ class TestUserUpdate:
             username=unique_username("oldusername"),
             password="password",
         )
-        await db.commit()
+        await db.flush()
 
         new_username = unique_username("newusername")
         updated = await update_user(db, user.id, username=new_username)
-        await db.commit()
+        await db.flush()
 
         assert updated.username == new_username
 
@@ -213,10 +213,10 @@ class TestUserUpdate:
             username=unique_username("passuser"),
             password="oldpassword",
         )
-        await db.commit()
+        await db.flush()
 
         updated = await update_user(db, user.id, password="newpassword")
-        await db.commit()
+        await db.flush()
 
         assert verify_password("newpassword", updated.password_hash) is True
         assert verify_password("oldpassword", updated.password_hash) is False
@@ -230,12 +230,12 @@ class TestUserUpdate:
             username=unique_username("activeuser"),
             password="password",
         )
-        await db.commit()
+        await db.flush()
 
         assert user.is_active is True
 
         updated = await update_user(db, user.id, is_active=False)
-        await db.commit()
+        await db.flush()
 
         assert updated.is_active is False
 
@@ -252,13 +252,13 @@ class TestUserDelete:
             username=unique_username("deleteuser"),
             password="password",
         )
-        await db.commit()
+        await db.flush()
 
         user_id = user.id
         person_id = user.person.id
 
         result = await delete_user(db, user_id)
-        await db.commit()
+        await db.flush()
 
         assert result is True
 
@@ -285,10 +285,10 @@ class TestUserRoles:
             username=unique_username("roleuser"),
             password="password",
         )
-        await db.commit()
+        await db.flush()
 
         result = await assign_role_to_user(db, user.id, "admin")
-        await db.commit()
+        await db.flush()
 
         assert result is not None
 
@@ -304,11 +304,11 @@ class TestUserRoles:
             username=unique_username("multirole"),
             password="password",
         )
-        await db.commit()
+        await db.flush()
 
         await assign_role_to_user(db, user.id, "admin")
         await assign_role_to_user(db, user.id, "user")
-        await db.commit()
+        await db.flush()
 
         roles = await list_user_roles(db, user.id)
         assert "admin" in roles
@@ -323,16 +323,16 @@ class TestUserRoles:
             username=unique_username("removerole"),
             password="password",
         )
-        await db.commit()
+        await db.flush()
 
         await assign_role_to_user(db, user.id, "admin")
-        await db.commit()
+        await db.flush()
 
         roles_before = await list_user_roles(db, user.id)
         assert "admin" in roles_before
 
         result = await remove_role_from_user(db, user.id, "admin")
-        await db.commit()
+        await db.flush()
 
         assert result is True
 
@@ -348,7 +348,7 @@ class TestUserRoles:
             username=unique_username("badrole"),
             password="password",
         )
-        await db.commit()
+        await db.flush()
 
         result = await assign_role_to_user(db, user.id, "nonexistent")
 
@@ -363,10 +363,10 @@ class TestUserRoles:
             username=unique_username("duprole"),
             password="password",
         )
-        await db.commit()
+        await db.flush()
 
         result1 = await assign_role_to_user(db, user.id, "admin")
-        await db.commit()
+        await db.flush()
 
         result2 = await assign_role_to_user(db, user.id, "admin")
 

@@ -25,7 +25,7 @@ class TestPersonCreate:
             firstname="John",
             lastname="Doe",
         )
-        await db.commit()
+        await db.flush()
 
         assert person.id is not None
         assert person.firstname == "John"
@@ -44,7 +44,7 @@ class TestPersonCreate:
             email="jane.doe@example.com",
             mobile="+49123456789",
         )
-        await db.commit()
+        await db.flush()
 
         assert person.firstname == "Jane"
         assert person.lastname == "Doe"
@@ -55,7 +55,7 @@ class TestPersonCreate:
         """Test creating multiple persons."""
         person1 = await create_person(db, firstname="Alice", lastname="Smith")
         person2 = await create_person(db, firstname="Bob", lastname="Smith")
-        await db.commit()
+        await db.flush()
 
         assert person1.id != person2.id
         assert person1.lastname == person2.lastname
@@ -63,7 +63,7 @@ class TestPersonCreate:
     async def test_person_full_name(self, db: AsyncSession):
         """Test the full_name property."""
         person = await create_person(db, firstname="Max", lastname="Mustermann")
-        await db.commit()
+        await db.flush()
 
         assert person.full_name == "Max Mustermann"
 
@@ -74,7 +74,7 @@ class TestPersonRead:
     async def test_get_person_by_id(self, db: AsyncSession):
         """Test getting a person by ID."""
         created = await create_person(db, firstname="Test", lastname="Person")
-        await db.commit()
+        await db.flush()
 
         fetched = await get_person(db, created.id)
 
@@ -101,7 +101,7 @@ class TestPersonRead:
             lastname="Test",
             email=unique_email,
         )
-        await db.commit()
+        await db.flush()
 
         person = await get_person_by_email(db, unique_email)
 
@@ -113,7 +113,7 @@ class TestPersonRead:
         await create_person(db, firstname="List1", lastname="Test")
         await create_person(db, firstname="List2", lastname="Test")
         await create_person(db, firstname="List3", lastname="Test")
-        await db.commit()
+        await db.flush()
 
         persons = await list_persons(db)
 
@@ -128,7 +128,7 @@ class TestPersonRead:
         """Test listing persons with pagination."""
         for i in range(5):
             await create_person(db, firstname=f"Page{i}", lastname="Test")
-        await db.commit()
+        await db.flush()
 
         page1 = await list_persons(db, skip=0, limit=2)
         page2 = await list_persons(db, skip=2, limit=2)
@@ -144,10 +144,10 @@ class TestPersonUpdate:
     async def test_update_person_firstname(self, db: AsyncSession):
         """Test updating a person's firstname."""
         person = await create_person(db, firstname="Original", lastname="Name")
-        await db.commit()
+        await db.flush()
 
         updated = await update_person(db, person.id, firstname="Updated")
-        await db.commit()
+        await db.flush()
 
         assert updated is not None
         assert updated.firstname == "Updated"
@@ -161,7 +161,7 @@ class TestPersonUpdate:
             lastname="Name",
             email="old@example.com",
         )
-        await db.commit()
+        await db.flush()
 
         updated = await update_person(
             db,
@@ -171,7 +171,7 @@ class TestPersonUpdate:
             email="new@example.com",
             mobile="+49999999999",
         )
-        await db.commit()
+        await db.flush()
 
         assert updated.firstname == "New"
         assert updated.lastname == "Person"
@@ -193,11 +193,11 @@ class TestPersonDelete:
     async def test_delete_person(self, db: AsyncSession):
         """Test deleting a person."""
         person = await create_person(db, firstname="ToDelete", lastname="Person")
-        await db.commit()
+        await db.flush()
         person_id = person.id
 
         result = await delete_person(db, person_id)
-        await db.commit()
+        await db.flush()
 
         assert result is True
 
